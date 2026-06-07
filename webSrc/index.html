@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FritzBox Verbindungsinformationen</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>FritzBox Verbindungsinformationen</h1>
+      <span id="last-updated"></span>
+    </header>
+
+    <div id="server-offline" class="server-offline" hidden>Server nicht erreichbar – angezeigte Daten sind möglicherweise veraltet.</div>
+
+    <div id="outage-tooltip" class="outage-tooltip" hidden></div>
+
+    <main>
+      <section id="card-connection">
+        <div class="monitor-speeds">
+          <div class="monitor-speed-block">
+            <div class="monitor-speed-header">
+              <span class="monitor-speed-dir">↓</span>
+              <span class="monitor-speed-label">Download</span>
+            </div>
+            <span class="monitor-speed-value" id="downstream">–</span>
+            <span class="monitor-speed-sub" id="downstream-mb"></span>
+          </div>
+          <div class="monitor-status-pill" id="status-dot">
+            <span class="monitor-status-label" id="status-label">–</span>
+          </div>
+          <div class="monitor-speed-block monitor-speed-block--right">
+            <div class="monitor-speed-header">
+              <span class="monitor-speed-dir">↑</span>
+              <span class="monitor-speed-label">Upload</span>
+            </div>
+            <span class="monitor-speed-value" id="upstream">–</span>
+            <span class="monitor-speed-sub" id="upstream-mb"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="card" id="card-outage">
+        <div class="outage-header">
+          <span class="card-label">Verbindungshistorie</span>
+          <div class="outage-header-meta">
+            <span id="outage-incidents"></span>
+            <span id="outage-uptime" class="outage-uptime">–</span>
+          </div>
+        </div>
+
+        <div class="outage-controls">
+          <button class="outage-period-btn" data-period="1h">1h</button>
+          <button class="outage-period-btn" data-period="6h">6h</button>
+          <button class="outage-period-btn active" data-period="24h">24h</button>
+          <button class="outage-period-btn" data-period="7d">7T</button>
+          <button class="outage-period-btn" data-period="30d">30T</button>
+          <button class="outage-period-btn" data-period="90d">90T</button>
+        </div>
+
+        <div id="outage-timeline" class="outage-timeline"></div>
+
+        <div class="outage-timeline-labels">
+          <span id="outage-label-start">–</span>
+          <span>Jetzt</span>
+        </div>
+
+        <div class="outage-legend">
+          <span class="outage-legend-item outage-legend-item--connected">Verbunden</span>
+          <span class="outage-legend-item outage-legend-item--connecting">Verbindet</span>
+          <span class="outage-legend-item outage-legend-item--interrupted">Unterbrochen</span>
+          <span class="outage-legend-item outage-legend-item--nodata">Keine Daten</span>
+        </div>
+      </section>
+
+      <section class="card" id="card-log">
+        <h2>Ereignisse (Internetzugang)</h2>
+        <table id="log-table">
+          <thead>
+            <tr>
+              <th>Zeit</th>
+              <th>Nachricht</th>
+            </tr>
+          </thead>
+          <tbody id="log-body">
+            <tr>
+              <td colspan="2" class="placeholder">Lade…</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+    </main>
+
+    <script type="module" src="script.js"></script>
+  </body>
+</html>
