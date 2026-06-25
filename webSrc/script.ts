@@ -76,6 +76,13 @@ function formatTime(date: Date): string {
   return date.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
+function getOutageUptimeClass(stats: OutageData["stats"], pct: number): string {
+  const downtime = stats.connecting + stats.interrupted;
+  if (downtime === 0) return "outage-uptime--good";
+  if (pct >= 95) return "outage-uptime--warn";
+  return "outage-uptime--bad";
+}
+
 function formatOutageIncidents(stats: OutageData["stats"]): string {
   const downtime = stats.connecting + stats.interrupted;
   if (downtime === 0) return "Keine Ausfälle";
@@ -209,8 +216,7 @@ function renderOutage(data: OutageData | null) {
 
   const pct = data.uptimePct;
   elOutageUptime.textContent = `${pct.toFixed(2)} % Uptime`;
-  elOutageUptime.className =
-    "outage-uptime " + (pct >= 99 ? "outage-uptime--good" : pct >= 95 ? "outage-uptime--warn" : "outage-uptime--bad");
+  elOutageUptime.className = "outage-uptime " + getOutageUptimeClass(data.stats, pct);
 
   elOutageIncidents.textContent = formatOutageIncidents(data.stats);
 

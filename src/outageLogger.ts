@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { FritzInfoManager, type ConnectionState } from "./fritzInfoManager";
+import { FritzInfoManager, type ConnectionState, type LogEvent } from "./fritzInfoManager";
 
 export type OutageMinuteState = "connected" | "connecting" | "interrupted";
 export type OutageBucketState = OutageMinuteState | "nodata";
@@ -68,6 +68,7 @@ export namespace OutageLogger {
   export function init() {
     loadFromDisk();
     currentMinuteStart = getMinuteStart(Date.now());
+    applyLogEvents(FritzInfoManager.getData().logEvents ?? []);
     sample();
     sampleInterval = setInterval(sample, SAMPLE_INTERVAL_MS);
   }
@@ -107,7 +108,7 @@ export namespace OutageLogger {
         buckets.push({ t, state: "nodata", connected: 0, connecting: 0, interrupted: 0, total: 0 });
       } else {
         const total = counts.connected + counts.connecting + counts.interrupted;
-        buckets.push({ t, state: resolveMajority(counts), ...counts, total });
+        buckets.push({ t, state: resolveWorst(counts), ...counts, total });
       }
     }
 
@@ -130,6 +131,8 @@ export namespace OutageLogger {
   }
 
   function sample() {
+    applyLogEvents(FritzInfoManager.getData().logEvents ?? []);
+
     const minuteStart = getMinuteStart(Date.now());
 
     if (minuteStart !== currentMinuteStart) {
@@ -146,36 +149,69 @@ export namespace OutageLogger {
     const total = sampleCounts.connected + sampleCounts.connecting + sampleCounts.interrupted;
     if (total === 0) return;
 
-    const state = resolveMajority(sampleCounts);
-    const existing = minutes.findIndex((m) => m.t === currentMinuteStart);
-
-    if (existing >= 0) {
-      minutes[existing]!.state = state;
-    } else {
-      minutes.push({ t: currentMinuteStart, state });
-    }
-
+    upsertMinute(currentMinuteStart, resolveWorst(sampleCounts));
     trimRetention();
     saveToDisk();
     sampleCounts = { connected: 0, connecting: 0, interrupted: 0 };
   }
 
-  function resolveMajority(counts: Record<OutageMinuteState, number>): OutageMinuteState {
-    let best: OutageMinuteState = "connected";
-    let bestCount = -1;
-    let bestPriority = -1;
+  function applyLogEvents(events: LogEvent[]) {
+    let changed = false;
+    const cutoff = Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-    for (const state of ["connected", "connecting", "interrupted"] as const) {
-      const count = counts[state];
-      const priority = STATE_PRIORITY[state];
-      if (count > bestCount || (count === bestCount && priority > bestPriority)) {
-        best = state;
-        bestCount = count;
-        bestPriority = priority;
-      }
+    for (const event of events) {
+      if (event.date.getTime() < cutoff) continue;
+
+      const state = classifyLogEvent(event.msg);
+      if (state === null) continue;
+
+      if (upsertMinute(getMinuteStart(event.date.getTime()), state)) changed = true;
     }
 
-    return best;
+    if (changed) {
+      trimRetention();
+      saveToDisk();
+    }
+  }
+
+  function classifyLogEvent(msg: string): OutageMinuteState | null {
+    const lower = msg.toLowerCase();
+
+    if (lower.includes("präfix erfolgreich")) return null;
+
+    if (lower.includes("wurde getrennt") || (lower.includes("unterbrochen") && !lower.includes("wird kurz unterbrochen"))) {
+      return "interrupted";
+    }
+
+    if (lower.includes("wird kurz unterbrochen") || lower.includes("wird hergestellt")) {
+      return "connecting";
+    }
+
+    return null;
+  }
+
+  function upsertMinute(t: number, state: OutageMinuteState): boolean {
+    const existing = minutes.findIndex((m) => m.t === t);
+
+    if (existing >= 0) {
+      const merged = mergeWorst(minutes[existing]!.state, state);
+      if (merged === minutes[existing]!.state) return false;
+      minutes[existing]!.state = merged;
+      return true;
+    }
+
+    minutes.push({ t, state });
+    return true;
+  }
+
+  function mergeWorst(a: OutageMinuteState, b: OutageMinuteState): OutageMinuteState {
+    return STATE_PRIORITY[a] >= STATE_PRIORITY[b] ? a : b;
+  }
+
+  function resolveWorst(counts: Record<OutageMinuteState, number>): OutageMinuteState {
+    if (counts.interrupted > 0) return "interrupted";
+    if (counts.connecting > 0) return "connecting";
+    return "connected";
   }
 
   function computeStats(mins: OutageMinute[]): OutageStats {
